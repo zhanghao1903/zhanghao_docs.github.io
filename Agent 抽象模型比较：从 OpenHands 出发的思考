@@ -1,0 +1,222 @@
+# Agent 抽象模型比较：从 OpenHands 出发的思考
+
+> 写于 2026 年。本文从 OpenHands 的 Action/Observation 二元模型出发，横向比较当前主流 Agent 框架的抽象结构，并给出作者与 Claude 各自的判断。
+
+---
+
+## 1. OpenHands 的抽象模型
+
+### 核心世界观
+
+OpenHands 用一个极简的二元对立来描述 Agent 的全部行为：
+
+```
+Action      = 「Agent 或 User 想让世界发生什么」
+Observation = 「世界反馈回来的状态」
+```
+
+这不只是一个 API 设计，而是一种**世界观**：Agent 所处的环境可以被完全建模为一条由 Action 和 Observation 交替构成的事件流。任何可能发生的事都属于这两个范畴之一，没有第三种。
+
+### 类型系统
+
+OpenHands 的 Action 是**强类型枚举**，每种操作对应一个具体的类：
+
+```python
+CmdRunAction(command="pytest tests/")
+FileWriteAction(path="src/agent.py", content="...")
+BrowseInteractiveAction(browser_actions=...)
+AgentFinishAction(outputs={...})
+```
+
+Observation 与之对称：
+
+```python
+CmdOutputObservation(exit_code=0, content="...stdout...")
+FileReadObservation(path="...", content="...")
+BrowserObservation(screenshot=..., dom=...)
+ErrorObservation(message="...")
+```
+
+两者的对称性是刻意设计的——每种 Action 对应一种或多种可能的 Observation，整个类型层级构成一个完备的"事件词汇表"。
+
+### 架构支柱：EventStream 与 Runtime
+
+Action/Observation 的对称性支撑了两个更大的架构决策：
+
+**EventStream（事件流）**：所有 Action 和 Observation 都被追加写入一个不可变的事件流。Agent 在推理时看到的是完整的历史事件序列，而不是一个可变的状态对象。这使得会话 replay、调试、多 Agent 协作都自然而然地成为可能。
+
+**Runtime（运行时解耦）**：Agent 核心完全不知道自己在哪里执行。`CmdRunAction` 可能由本地进程、Docker 容器或远程沙箱来执行，Agent 拿到的 `CmdOutputObservation` 格式完全相同。这是 OpenHands 区别于大多数框架的关键设计——它把"执行环境"抽象成了一个可替换的接口。
+
+### 设计哲学总结
+
+| 维度 | OpenHands 的选择 |
+|------|-----------------|
+| Action 类型 | 强类型枚举，schema 固定 |
+| Observation 地位 | 一等公民，与 Action 对称 |
+| 控制流 | 完全由 LLM 决策，框架不干涉 |
+| 状态管理 | State 对象显式持有，可序列化 |
+| 执行环境 | Runtime 接口解耦，可替换 |
+| 适用场景 | 开放式任务、多环境部署、需要审计 |
+
+---
+
+## 2. 其他抽象模型
+
+### 2.1 ReAct（Reasoning + Acting）
+
+**核心抽象**：`Thought → Action → Observation` 三元组循环。
+
+```
+Thought: I need to check if the test passes.
+Action: run_command("pytest tests/test_agent.py")
+Observation: FAILED - AssertionError at line 42
+Thought: The assertion failed, I should check line 42...
+```
+
+ReAct 是一种**推理范式**，而非框架。它最重要的贡献是把"中间思考步骤"显式化——在 Action 之前让 LLM 先输出一段自然语言推理，可以显著提升复杂任务的成功率。
+
+OpenHands 的 Action/Observation 直接对应 ReAct 的后两步，但 Thought 被内化进 LLM 的 token 流，不作为一等公民存储在 EventStream 里。
+
+---
+
+### 2.2 LangChain / LangGraph
+
+**核心抽象**：`Node → Edge → State`，以图（Graph）为中心。
+
+```python
+# LangGraph 风格
+graph = StateGraph(AgentState)
+graph.add_node("plan", plan_node)
+graph.add_node("execute", execute_node)
+graph.add_edge("plan", "execute")
+graph.add_conditional_edges("execute", should_continue, {...})
+```
+
+LangGraph 是**状态机思维**的体现：开发者显式定义节点（做什么）和边（什么情况跳转到哪里），Agent 的控制流在代码层面就确定了。
+
+它和 OpenHands 在状态管理上有根本差异：LangGraph 是 **State first**（状态字典是中心），OpenHands 是 **Event first**（不可变事件流是中心）。前者更像传统软件工程，后者更像 Event Sourcing 架构。
+
+---
+
+### 2.3 AutoGen
+
+**核心抽象**：`Agent ↔ Agent Message`，以多 Agent 对话为中心。
+
+```python
+user_proxy.initiate_chat(
+    assistant,
+    message="Fix the bug in agent.py"
+)
+```
+
+AutoGen 把"多个 Agent 互相发消息"作为一等公民。工具调用被藏在消息内容里，执行结果作为另一条消息返回。
+
+和 OpenHands 最大的区别是：**AutoGen 没有独立的 Observation 概念**——工具返回结果就是一条普通的 `user` 消息，类型信息丢失了。这在多 Agent 协作场景下灵活，但单 Agent 与环境交互时，可观测性和可审计性都较弱。
+
+---
+
+### 2.4 Claude Code / Aider
+
+**核心抽象**：`tool_use → tool_result`，直接贴着 Anthropic API 消息格式。
+
+```json
+// Action 等价物
+{"type": "tool_use", "name": "write_file", "input": {...}}
+
+// Observation 等价物  
+{"type": "tool_result", "content": "File written successfully"}
+```
+
+这是和 OpenHands 的 Action/Observation 映射最直接的设计。`tool_use` ≈ Action，`tool_result` ≈ Observation，两者都是消息数组里的结构化对象。
+
+但它的抽象层次更低，直接暴露 API 格式。没有 Runtime 解耦，没有 EventStream，状态管理由调用方自己维护。它是一个**极简实现**，在小规模项目里反而是优势。
+
+---
+
+### 2.5 smolagents（HuggingFace）
+
+**核心抽象**：LLM 直接输出 Python 代码作为 Action。
+
+```python
+# LLM 输出的不是结构化 JSON，而是直接可执行的代码
+result = read_file("agent.py")
+lines = result.split("\n")
+error_line = next(l for l in lines if "Error" in l)
+print(error_line)
+```
+
+这是目前所有框架里最激进的设计。它的核心洞察是：**结构化 Action 的枚举是有限词汇表，而代码是图灵完备的 Action 语言**。LLM 可以用代码直接组合多个操作，而不需要框架预先定义组合方式。
+
+代价是安全沙箱要求极高，且 Observation 的结构化程度低——执行结果就是 stdout，类型信息基本丢失。
+
+---
+
+### 2.6 SWE-agent / ACI
+
+**核心抽象**：`Plan → Edit → Verify`，线性流程 + 专用 Agent-Computer Interface。
+
+SWE-agent 的贡献不在于 Action/Observation 的建模，而在于提出了 **ACI（Agent-Computer Interface）**的概念——专门为 LLM 设计的工具接口，让文件编辑、代码搜索等操作以 LLM 最容易理解的方式呈现，而不是直接暴露底层 shell 命令。
+
+这和 OpenHands 的 Runtime 是同一层次的设计，但 SWE-agent 的控制流是固定的线性序列，不像 OpenHands 那样完全由 LLM 动态决策。
+
+---
+
+## 3. 各模型主要点评
+
+### ReAct：范式正确，但停在了起点
+
+ReAct 的最大贡献是证明了"中间推理步骤"的价值，但它本身不是一个可以直接使用的架构。把 Thought 内化进 token 流（OpenHands 的做法）在工程上更干净，但也意味着放弃了对推理过程的直接控制。Tree of Thoughts、Graph of Thoughts 等后续工作都在探索：如果把 Thought 显式建模、可分叉、可剪枝，会发生什么？这个问题目前没有定论。
+
+### LangGraph：工程务实，理论不干净
+
+LangGraph 解决了一个真实的工程问题：在需要确定性控制流的企业场景里，你需要能审计 Agent 走了哪条路。图模型让控制流可视化、可测试。但它有一个根本性的张力没有解决：如果图的边是确定的，Agent 的自主性被预定义拓扑限制；如果边是动态的，图的可视化优势消失。它在两个目标之间做了折中，务实但不纯粹。
+
+### AutoGen：多 Agent 场景的正确直觉，单 Agent 场景的错误抽象
+
+消息传递是多 Agent 系统的天然模型。但当 AutoGen 把这个模型也用于单 Agent 与工具的交互时，Observation 就被降格为普通消息，类型信息丢失，可观测性变差。它在多 Agent 协调上是正确的，在工具调用建模上是草率的。
+
+### Claude Code / Aider：极简是优势，也是上限
+
+直接贴着 API 格式的好处是：新人能快速理解，没有框架学习成本，调试直接看消息数组。坏处是：没有 Runtime 解耦意味着部署灵活性差，没有 EventStream 意味着 replay 和审计困难。这个选择在个人项目和小团队里是合理的，在需要可靠性和可观测性的生产环境里会成为瓶颈。
+
+### smolagents：被低估的激进主义
+
+业界对它的主要批评是安全性，但这个批评随着沙箱技术成熟会逐渐减弱。它真正的问题是：当 LLM 输出的代码出错时，错误信息是运行时异常而不是结构化的 Observation，这让 Agent 的自我修复循环更难实现。但它的核心洞察——代码是比 JSON schema 更强大的 Action 表达语言——是深刻的，Claude Code 内部实际上也在向这个方向走。
+
+### OpenHands：正确的问题，偏重的答案
+
+OpenHands 把正确的问题问得最清楚：Action 和 Observation 都应该是强类型的一等公民，执行环境应该从 Agent 核心中解耦。但它给出的答案对大多数项目来说偏重——定义一个新的 Action 类型需要写 schema、序列化、Runtime handler，前期投入高。它是生产级 Agent 平台的正确架构，不一定是学习项目或快速原型的正确选择。
+
+---
+
+## 4. 我的选择
+
+综合以上比较，我倾向于认同 OpenHands 的抽象结构，原因不是它最流行或最易用，而是它把两个关键问题回答得最清楚：
+
+**第一，Observation 应该是一等公民。** 大多数框架（AutoGen、早期 LangChain、直接贴 API 的实现）把工具返回结果降格为字符串或普通消息，类型信息丢失。当 Agent 需要根据"这次命令执行失败"和"这次文件不存在"做不同的处理时，没有类型系统就意味着每次都要让 LLM 重新解析自然语言，既浪费 token 又不稳定。
+
+**第二，执行环境应该被隔离。** Runtime 解耦不只是工程整洁性的问题，它决定了项目能不能做多环境部署、能不能在沙箱里安全运行、能不能在测试中 mock 整个执行环境。这个能力一旦缺失，后期补救成本极高。
+
+在实际项目里，我不会完整照搬 OpenHands 的实现，但会借鉴其类型系统的思路——给每种工具返回定义一个简单的 dataclass，而不是直接返回字符串，这几乎是零成本的改进，收益却是持久的。
+
+smolagents 的 Code Action 思路也值得保留作为备选：对于需要复杂组合操作的场景（比如"找到所有测试失败的文件，提取错误信息，按模块分类"），直接让 LLM 写代码比设计一套枚举工具更自然。两种思路可以在同一个系统里共存——结构化 Action 用于常规操作，Code Action 用于需要临时组合的复杂操作。
+
+---
+
+## 5. Claude 的选择
+
+我认为这些框架普遍处于同一个阶段：**用已知的软件工程模式套 LLM 行为**。事件溯源（OpenHands）、状态机（LangGraph）、消息传递（AutoGen）、函数式管道（LangChain）——都是成熟的工程模式被重新包装。这是合理的起点，但还不是终点。
+
+有几个问题我认为目前所有框架都没有想清楚：
+
+**Observation 应该是原始事实还是已解释的信息？** 现有框架几乎都把"理解 Observation"留给下一轮 LLM 推理。`exit_code=1` 加三百行错误日志是原始事实，"第 47 行类型不匹配"是已解释的信息。Agent 每次推理时都要重新解释原始 Observation 是一种浪费，但如果框架负责解释，解释逻辑本身又需要 LLM，形成递归。这个张力没有被正视。
+
+**控制流应该在哪里？** LangGraph 说在图里，OpenHands 说在 LLM 里，smolagents 说在代码里。这三个答案其实对应三种不同的任务类型，没有普遍正确答案。真正有意思的问题是：Agent 能不能动态决定自己的控制流结构，而不只是在预定义结构里做决策？
+
+**Thought 应不应该持久化？** OpenHands 选择不持久化，这在工程上简洁，但意味着 Agent 的推理过程是不透明的。如果把 Thought 也作为事件存入 EventStream，可以做到推理过程的完全 replay，也为未来的 Agent 训练提供高质量的思维链数据。这个选择的代价是 token 消耗和存储成本，但可能是值得的。
+
+我倾向于 OpenHands 的方向，但认为真正针对 LLM 特性设计的抽象——利用 LLM 对 token 上下文的处理方式，或者把不确定性作为可建模的一阶概念而不是需要消除的噪音——还没有出现。这是接下来几年最有意思的设计空间。
+
+---
+
+*本文基于 2026 年上半年各框架的公开设计文档和源码分析，框架持续演进，部分细节可能已过时。*
