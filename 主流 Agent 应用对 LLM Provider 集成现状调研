@@ -1,0 +1,1138 @@
+# 主流 Agent 应用对 LLM Provider 集成现状调研（2026）
+
+> 日期：2026-05-22  
+> 主题：当前主流 Agent 应用、Agent Builder、AI Coding Agent、RAG 平台，对 LLM Provider 的集成深度与能力边界分析。
+
+---
+
+# 1. 行业整体做到什么地步了
+
+截至 2026 年，主流 Agent 应用对 LLM Provider 的集成大致已经做到：
+
+```text
+多 Provider 可用
+BYOK（用户自带 API Key）
+OpenAI-compatible 兜底
+自建 RAG / 文件层 / 工具层
+```
+
+但大多数产品还没有做到：
+
+```text
+逐家 Provider 原生文件 API 深度集成
+Provider-specific capability 精细抽象
+统一 citation / page reference
+统一 cost / quota / usage 管理
+统一 file lifecycle / cleanup
+```
+
+行业整体可以抽象成 7 层成熟度：
+
+| 层级 | 能力 | 行业成熟度 |
+|---|---|---|
+| L1 | API Key / Base URL / Model 配置 | 非常成熟 |
+| L2 | 多 Provider 支持 | 非常成熟 |
+| L3 | OpenAI-compatible 兜底 | 非常成熟 |
+| L4 | Streaming / Tool Calling 抽象 | 较成熟 |
+| L5 | 自建文件上传 / RAG / 向量库 | 较成熟 |
+| L6 | Provider 原生文件 API 深度集成 | 不普遍 |
+| L7 | 成本 / 路由 / fallback / quota 治理 | 主要依赖网关 |
+
+一句话概括：
+
+> 主流 Agent 应用已经普遍支持“多模型可用”，但大多还没有把“多模型差异”抽象得足够细。
+
+---
+
+# 2. 主流 Agent 产品分类
+
+目前主流 Agent 应用大致可以分成五类：
+
+| 类型 | 代表产品 | 核心特点 |
+|---|---|---|
+| Agent Builder | Dify、Coze、Botpress | 平台化、工作流、知识库、插件 |
+| 自托管 Chat / RAG | Open WebUI、LibreChat、AnythingLLM、LobeChat | BYOK、自建 RAG、多模型 |
+| Low-code Agent | Langflow、Flowise、n8n | 节点式工作流、工具编排 |
+| Coding Agent | Cline、Roo Code、Continue、Cursor、Windsurf | 工具执行、代码上下文、终端 |
+| Model Gateway | LiteLLM、OpenRouter、Vercel AI Gateway | Provider 路由与统一 API |
+
+---
+
+# 3. Agent Builder 平台现状
+
+## 3.1 Dify
+
+Dify 是目前比较完整的 Agent Builder 平台之一。
+
+特点：
+
+```text
+Workspace 级 Provider 管理
+BYOK
+Workflow
+Knowledge Base
+插件体系
+多模型
+```
+
+Dify 的文件能力主要是：
+
+```text
+上传文件
+解析文件
+切 chunk
+向量化
+检索
+把结果作为上下文交给模型
+```
+
+而不是逐家深度接入：
+
+```text
+OpenAI File Search
+Gemini File API
+Claude Files API
+Qwen-Long
+Kimi 文件抽取
+```
+
+### Dify 的集成特点
+
+| 能力 | 状态 |
+|---|---|
+| 多 Provider | 高 |
+| BYOK | 高 |
+| Workflow | 高 |
+| Knowledge Base | 高 |
+| 原生文件 API 深度 | 中 |
+| OpenAI-compatible | 高 |
+
+### Dify 的启发
+
+Dify 的重点不是：
+
+```text
+逐家 provider 深度适配
+```
+
+而是：
+
+```text
+Provider → Workspace Resource
+文件 → Knowledge
+模型 → Workflow Node
+```
+
+---
+
+## 3.2 Coze / 扣子
+
+Coze 更偏托管型 Agent 平台。
+
+特点：
+
+```text
+插件市场
+工作流
+知识库
+渠道发布
+Agent 平台
+```
+
+Coze 也支持知识库和自定义模型，但：
+
+```text
+Provider 抽象能力不如开源 BYOK 产品开放
+```
+
+更像：
+
+```text
+平台化 Agent Runtime
+```
+
+### Coze 的特点
+
+| 能力 | 状态 |
+|---|---|
+| Knowledge Base | 高 |
+| 插件体系 | 高 |
+| Workflow | 高 |
+| 多模型 | 中高 |
+| Provider 自由度 | 中 |
+
+### Coze 的启发
+
+面向业务用户的平台：
+
+```text
+会尽量隐藏 Provider 差异
+```
+
+但：
+
+```text
+底层可控性会下降
+```
+
+---
+
+## 3.3 Botpress
+
+Botpress 更偏客服和业务流程 Agent。
+
+重点：
+
+```text
+知识库
+渠道
+客服
+工作流
+```
+
+而不是：
+
+```text
+自由多模型路由
+```
+
+### Botpress 的特点
+
+| 能力 | 状态 |
+|---|---|
+| Knowledge Base | 高 |
+| 渠道集成 | 高 |
+| Workflow | 高 |
+| 多模型 | 中 |
+| 原生文件 API 深度 | 低 |
+
+### 启发
+
+垂直场景 Agent：
+
+```text
+更重业务系统与知识库
+```
+
+而不是：
+
+```text
+让用户自由调大量模型
+```
+
+---
+
+# 4. 自托管 Chat / RAG 平台现状
+
+## 4.1 Open WebUI
+
+Open WebUI 是典型的：
+
+```text
+协议优先
+```
+
+路线。
+
+核心思想：
+
+```text
+优先兼容 OpenAI Chat 协议
+```
+
+而不是：
+
+```text
+逐家 provider 深度适配
+```
+
+### Open WebUI 的特点
+
+| 能力 | 状态 |
+|---|---|
+| BYOK | 高 |
+| OpenAI-compatible | 非常高 |
+| 自托管 | 高 |
+| 本地模型 | 高 |
+| 文件 / RAG | 中高 |
+| 原生文件 API 深度 | 低 |
+
+### 启发
+
+Open WebUI 的路线本质是：
+
+```text
+广覆盖
+```
+
+而不是：
+
+```text
+深集成
+```
+
+---
+
+## 4.2 LibreChat
+
+LibreChat 更像：
+
+```text
+开源 ChatGPT + Agent UI
+```
+
+特点：
+
+```text
+多模型
+Agents
+RAG API
+文件上传
+向量检索
+```
+
+它的 RAG API：
+
+```text
+独立于 Provider
+```
+
+这是很重要的设计。
+
+### 启发
+
+文件问答：
+
+```text
+不一定要依赖 Provider 原生文件 API
+```
+
+完全可以：
+
+```text
+自建 RAG API
+```
+
+---
+
+## 4.3 AnythingLLM
+
+AnythingLLM 的重点：
+
+```text
+本地知识库
+本地向量数据库
+文件管理
+Workspace
+Agent
+```
+
+它把：
+
+```text
+文件 / RAG
+```
+
+当作产品核心层。
+
+### AnythingLLM 的特点
+
+| 能力 | 状态 |
+|---|---|
+| RAG | 高 |
+| 本地模型 | 高 |
+| BYOK | 高 |
+| 多向量数据库 | 高 |
+| Provider 原生文件 API 深度 | 低 |
+
+### 启发
+
+对于 BYOK 产品：
+
+```text
+自建文件层和 RAG 层非常重要
+```
+
+---
+
+## 4.4 LobeChat
+
+LobeChat 的特点是：
+
+```text
+Provider 覆盖极广
+```
+
+支持：
+
+```text
+OpenAI
+Anthropic
+Gemini
+DeepSeek
+Qwen
+Moonshot
+Groq
+Fireworks
+Together
+OpenRouter
+Bedrock
+Azure
+...
+```
+
+但：
+
+```text
+文件和知识库仍主要走自建技术栈
+```
+
+### 启发
+
+行业已经证明：
+
+```text
+Provider 广度可以很高
+```
+
+但：
+
+```text
+文件层仍建议自己掌握
+```
+
+---
+
+# 5. Low-code Agent / Workflow 平台现状
+
+## 5.1 Langflow
+
+Langflow 是：
+
+```text
+低代码 AI Builder
+```
+
+重点：
+
+```text
+Agent
+MCP
+Workflow
+Document Parser
+Vector DB
+```
+
+它的文件能力：
+
+```text
+组件化
+```
+
+而不是写死在模型层。
+
+### 启发
+
+文件解析：
+
+```text
+应该是独立组件
+```
+
+而不是：
+
+```text
+Provider 的附属能力
+```
+
+---
+
+## 5.2 Flowise
+
+Flowise 更偏：
+
+```text
+视觉化 Agent 编排
+```
+
+Provider 能力大多通过：
+
+```text
+LangChain 生态
+```
+
+扩展。
+
+### 启发
+
+Flowise 的思路：
+
+```text
+先做组件化
+```
+
+而不是：
+
+```text
+先做深度 Provider 抽象
+```
+
+---
+
+## 5.3 n8n
+
+n8n 的重点不是模型，而是：
+
+```text
+工作流
+外部系统
+工具连接
+审批
+```
+
+Agent 只是其中一个节点。
+
+### n8n 的特点
+
+| 能力 | 状态 |
+|---|---|
+| Workflow | 非常高 |
+| 工具集成 | 非常高 |
+| Agent | 高 |
+| 多模型 | 中高 |
+| 文件能力 | 中 |
+
+### 启发
+
+Agent 的价值：
+
+```text
+不仅是模型
+```
+
+而是：
+
+```text
+模型能连接什么系统
+```
+
+---
+
+# 6. AI Coding Agent 的集成现状
+
+Coding Agent 和通用 Agent 不一样。
+
+重点是：
+
+```text
+终端
+文件系统
+代码库
+工具调用
+本地模型
+BYOK
+```
+
+而不是：
+
+```text
+PDF 上传问答
+```
+
+---
+
+## 6.1 Cline
+
+Cline 的特点：
+
+```text
+Every model
+No vendor lock-in
+```
+
+支持：
+
+```text
+OpenAI
+Anthropic
+Gemini
+OpenRouter
+Ollama
+DeepSeek
+...
+```
+
+### Cline 的重点
+
+```text
+终端
+浏览器
+文件读写
+工具执行
+```
+
+### 启发
+
+真正的 Agent：
+
+```text
+核心是执行能力
+```
+
+而不是：
+
+```text
+只会聊天
+```
+
+---
+
+## 6.2 Roo Code
+
+Roo Code 做得比较先进的一点：
+
+```text
+Profile 化
+```
+
+不同 profile：
+
+```text
+不同 provider
+不同模型
+不同参数
+```
+
+### 启发
+
+你们也应该：
+
+```text
+按任务管理模型配置
+```
+
+例如：
+
+```text
+聊天模型
+推理模型
+Embedding 模型
+Vision 模型
+Rerank 模型
+```
+
+---
+
+## 6.3 Continue
+
+Continue 的一个很重要设计：
+
+```text
+模型按角色分工
+```
+
+例如：
+
+```text
+chat
+edit
+apply
+autocomplete
+embed
+rerank
+```
+
+### 启发
+
+这是很值得学习的设计。
+
+未来：
+
+```text
+不会只有一个“大模型”
+```
+
+而是：
+
+```text
+多模型协作
+```
+
+---
+
+## 6.4 Cursor / Windsurf
+
+商业 Coding Agent：
+
+```text
+产品体验非常强
+```
+
+但：
+
+```text
+BYOK 自由度通常有限
+```
+
+原因：
+
+```text
+成本
+稳定性
+商业策略
+```
+
+### 启发
+
+商业产品：
+
+```text
+更重体验一致性
+```
+
+开源产品：
+
+```text
+更重自由度
+```
+
+---
+
+# 7. 模型网关已经成为行业基础设施
+
+很多 Agent 应用：
+
+```text
+并不直接集成所有 Provider
+```
+
+而是依赖：
+
+```text
+LiteLLM
+OpenRouter
+Vercel AI Gateway
+```
+
+---
+
+## 7.1 LiteLLM
+
+LiteLLM 提供：
+
+```text
+统一 OpenAI 格式 API
+```
+
+支持：
+
+```text
+100+ Provider
+```
+
+包括：
+
+```text
+OpenAI
+Anthropic
+Gemini
+Bedrock
+Vertex AI
+Azure
+...
+```
+
+### LiteLLM 的作用
+
+```text
+Provider Routing
+Fallback
+Usage
+Spend Tracking
+Unified API
+```
+
+### 启发
+
+很多产品：
+
+```text
+把 Provider 广度交给 LiteLLM
+```
+
+---
+
+## 7.2 OpenRouter
+
+OpenRouter：
+
+```text
+统一 API
+模型路由
+Provider fallback
+BYOK
+```
+
+### 启发
+
+OpenRouter：
+
+```text
+解决模型接入
+```
+
+但：
+
+```text
+不解决复杂文件体验
+```
+
+---
+
+## 7.3 Vercel AI Gateway
+
+Vercel AI Gateway：
+
+```text
+统一 Provider API
+Routing
+Fallback
+```
+
+重点：
+
+```text
+应用不需要频繁改 Provider 代码
+```
+
+---
+
+# 8. 主流产品普遍已经做好的能力
+
+现在成熟 Agent 应用普遍已经支持：
+
+```text
+1. 多 Provider
+2. 用户自带 API Key
+3. OpenAI-compatible
+4. Streaming
+5. Tool Calling
+6. 文件上传
+7. 知识库 / RAG
+8. 本地模型
+9. Workflow
+10. MCP / 插件
+11. 基础错误处理
+```
+
+这些已经成为：
+
+```text
+行业基础能力
+```
+
+---
+
+# 9. 主流产品普遍还没做好的能力
+
+这里才是机会。
+
+---
+
+## 9.1 Provider 原生文件 API 深度不足
+
+大多数产品：
+
+```text
+支持文件上传
+```
+
+但实际上：
+
+```text
+文件是产品自己解析
+```
+
+而不是：
+
+```text
+逐家深度接入：
+OpenAI File Search
+Gemini File API
+Claude Files API
+Qwen-Long
+Kimi 文件抽取
+Bedrock Document Input
+```
+
+这意味着：
+
+```text
+文件输入层还有很大空间
+```
+
+---
+
+## 9.2 Capability Detection 粗糙
+
+多数产品只知道：
+
+```text
+这个 provider 支持 chat
+这个 provider 支持 streaming
+```
+
+但很少做到：
+
+```text
+支持 PDF？
+支持 DOCX？
+支持 scanned PDF？
+支持 file_id？
+支持 file_url？
+支持 base64？
+支持 citation？
+支持 page reference？
+支持 structured output？
+支持 reasoning token？
+```
+
+这是未来重要方向。
+
+---
+
+## 9.3 引用系统不统一
+
+现在很多产品：
+
+```text
+能回答
+```
+
+但：
+
+```text
+引用质量差
+```
+
+例如：
+
+```text
+页码不准
+来源混乱
+表格定位差
+扫描件不稳定
+```
+
+统一：
+
+```text
+chunk
+page
+quote
+bbox
+source confidence
+```
+
+会是重要竞争力。
+
+---
+
+## 9.4 成本 / 配额治理不足
+
+很多产品：
+
+```text
+只会报错
+```
+
+但不会：
+
+```text
+quota 管理
+provider fallback
+费用估算
+token 统计
+provider-specific usage normalization
+```
+
+这也是未来重点。
+
+---
+
+## 9.5 Tool Calling 差异没有被隐藏
+
+不同 Provider：
+
+```text
+tool calling 差异很大
+```
+
+包括：
+
+```text
+OpenAI
+Anthropic
+Gemini
+Qwen
+DeepSeek
+Mistral
+```
+
+多数产品：
+
+```text
+只做了表层兼容
+```
+
+复杂 Agent：
+
+```text
+仍然会遇到很多差异
+```
+
+---
+
+# 10. 对 BYOK Agent 产品的启发
+
+行业已经形成一个明显趋势：
+
+```text
+少数 Provider 深度集成
+多数 Provider OpenAI-compatible 接入
+```
+
+真正重要的是：
+
+```text
+统一文件层
+统一 RAG
+统一工具层
+统一上下文编排
+统一错误处理
+统一引用系统
+```
+
+---
+
+# 11. 推荐路线
+
+建议：
+
+## 第一层：Generic Provider
+
+覆盖：
+
+```text
+OpenAI-compatible
+LiteLLM
+OpenRouter
+Ollama
+LM Studio
+自定义 Base URL
+```
+
+只承诺：
+
+```text
+文本 Chat
+Streaming
+RAG 后文本输入
+```
+
+---
+
+## 第二层：深度集成少数 Provider
+
+建议优先：
+
+```text
+OpenAI
+Gemini
+Claude
+Qwen
+DeepSeek
+Kimi
+```
+
+其中：
+
+```text
+OpenAI / Gemini / Claude / Qwen
+→ 原生文件 + RAG 双路径
+
+DeepSeek
+→ 自建文件层 + RAG
+
+Kimi
+→ 文件抽取 + 长上下文
+```
+
+---
+
+## 第三层：文件能力作为产品核心
+
+你们应该自己拥有：
+
+```text
+File Service
+Parser Service
+OCR
+Chunker
+Embedding
+Vector Store
+Citation
+Planner
+```
+
+Provider 文件 API：
+
+```text
+只是 fast path
+```
+
+---
+
+# 12. 最终结论
+
+当前主流 Agent 应用已经做到：
+
+```text
+多 Provider
+BYOK
+OpenAI-compatible
+文件上传
+RAG
+Workflow
+Tool Calling
+MCP
+本地模型
+```
+
+但还没有普遍做到：
+
+```text
+Provider 原生文件 API 深度统一
+Capability 精细抽象
+统一引用系统
+统一文件生命周期
+统一 quota / usage / cost
+统一 tool calling 差异
+文件策略自动路由
+```
+
+所以未来真正有价值的方向不是：
+
+```text
+支持更多 Provider
+```
+
+而是：
+
+```text
+把用户自带 LLM API 的复杂性藏起来
+```
+
+一句话总结：
+
+> 主流 Agent 产品已经解决了“多模型可用”，但还没有完全解决“多模型差异统一”。
