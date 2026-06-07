@@ -1,1165 +1,400 @@
 # 主流 Agent 应用对 LLM Provider 集成现状调研（2026）
 
-> 日期：2026-05-22  
-> 主题：主流 Agent 应用、Agent Builder、AI Coding Agent、模型网关对 LLM Provider 的集成现状，以及文件/RAG/工具层的行业演进方向。
+> 本文基于 2026-05-22 的调研整理，关注主流 Agent 应用、Agent Builder、AI Coding Agent 和模型网关对 LLM Provider 的集成现状。
 
----
+如果只看功能列表，2026 年的主流 Agent 应用已经很接近：
 
-# 1. 行业整体做到什么地步了
+- 多 Provider；
+- BYOK；
+- OpenAI-compatible；
+- Streaming；
+- Tool Calling；
+- 文件上传；
+- RAG / 知识库；
+- Workflow / Agent；
+- 本地模型；
+- MCP / Plugin。
 
-截至 2026 年，主流 Agent 应用对 LLM Provider 的集成已经普遍做到：
+但这并不意味着 LLM Provider 集成已经成熟。
 
-```text
-多 Provider
-BYOK（Bring Your Own Key）
-OpenAI-compatible
-Streaming
-Tool Calling
-文件上传
-RAG / 知识库
-Workflow / Agent
-本地模型
-```
-
-但大多数产品：
-
-```text
-还没有真正逐家打穿 Provider 原生文件 API
-没有统一不同 Provider 的文件能力
-没有统一 citation / 页码 / 引用格式
-没有统一 usage / quota / cleanup
-没有真正做好 capability abstraction
-```
-
-行业普遍停留在：
-
-```text
-广覆盖
-```
-
-而不是：
-
-```text
-深集成
-```
-
----
-
-# 2. LLM Provider 集成成熟度分层
-
-建议把行业集成成熟度分成 7 层。
-
-| 层级 | 能力 | 行业现状 |
-|---|---|---|
-| L1 | API Key / Base URL / Model Name 配置 | 基本都做到了 |
-| L2 | 多 Provider 预置 | 很普遍 |
-| L3 | OpenAI-compatible 兜底 | 非常普遍 |
-| L4 | 统一 Chat / Streaming / Tool Calling | 部分成熟 |
-| L5 | 自建文件上传 / RAG / 向量库 / 知识库 | 主流产品基本都在做 |
-| L6 | Provider 原生文件 API 深度集成 | 不普遍 |
-| L7 | 成本 / 路由 / fallback / quota / usage 治理 | 多交给 LiteLLM / OpenRouter |
-
-一句话总结：
-
-> 行业已经做到“多模型可用”，但还没有做到“多模型差异真正被抽象”。
-
----
-
-# 3. 主流产品的集成路线
-
-行业已经明显分化成几条路线：
-
-| 路线 | 代表产品 | 核心特点 |
-|---|---|---|
-| Agent Builder | Dify、Coze、Botpress | 平台化、Workflow、Knowledge、插件 |
-| 自托管 Chat/RAG | Open WebUI、LibreChat、AnythingLLM、LobeChat | BYOK、自建 RAG、多模型 |
-| Low-code Agent/RAG | Langflow、Flowise、n8n | 节点化、工具化、工作流 |
-| Coding Agent | Cline、Roo Code、Continue、Cursor、Windsurf | 强工具执行、代码上下文、终端 |
-| Model Gateway | LiteLLM、OpenRouter、Vercel AI Gateway | 模型路由、fallback、统一 API |
-
----
-
-# 4. Dify
-
-Dify 是目前较成熟的平台型方案之一。
-
-其核心能力：
-
-```text
-Workspace 级 Provider 管理
-BYOK
-Knowledge
-Workflow
-Agent
-Plugin
-```
-
-它的重点：
-
-```text
-不是逐家深度接入 provider
-而是把：
-Provider → Workspace Resource
-File → Knowledge
-Tool → Plugin
-```
-
-统一抽象成平台资源。
-
-## Dify 的特点
-
-### 优点
-
-```text
-Provider 管理成熟
-Knowledge/RAG 成熟
-Workflow 强
-Agent 能力完整
-```
-
-### 缺点
-
-```text
-Provider 原生文件 API 深度一般
-更多走自己的 Knowledge/RAG
-```
-
-## 启发
-
-Dify 的真正价值：
-
-> 把 Provider、Knowledge、Workflow 抽象成统一平台资源。
-
----
-
-# 5. Open WebUI
-
-Open WebUI 的路线非常典型：
-
-```text
-协议优先
-```
-
-核心思想：
-
-```text
-优先围绕：
-OpenAI Chat Completions
-OpenAI-compatible
-```
-
-而不是：
-
-```text
-逐家 provider 深度定制
-```
-
-## 特点
-
-```text
-BYOK
-Ollama
-OpenAI-compatible
-多 Provider
-文件上传
-Web Search
-Tool
-Code Execution
-```
-
-## 它的策略
-
-```text
-Provider 广覆盖
-能力浅统一
-```
-
-大量能力通过：
-
-```text
-LiteLLM
-OpenRouter
-Middleware
-```
-
-完成。
-
-## 启发
-
-这是行业非常典型的一条路线：
-
-> “广覆盖 + OpenAI-compatible + 自建 RAG”。
-
----
-
-# 6. LibreChat
-
-LibreChat 更像：
-
-```text
-开源版 ChatGPT + Agent UI
-```
-
-它的特点：
-
-```text
-Agents
-RAG API
-多 Provider
-BYOK
-```
-
-重点：
-
-```text
-文件问答主要通过：
-自己的 RAG API
-```
-
-而不是：
-
-```text
-逐家 Provider 原生文件 API
-```
-
-## 启发
-
-说明：
-
-> 文件问答完全可以独立于 Provider 原生文件能力。
-
----
-
-# 7. AnythingLLM
-
-AnythingLLM 是：
-
-```text
-BYOK + 自建 RAG
-```
-
-路线的代表。
-
-## 特点
-
-```text
-文档上传
-向量数据库
-Agents
-本地模型
-Workspace
-多 Provider
-```
-
-Provider 的作用：
-
-```text
-主要负责：
-推理
-```
-
-而：
-
-```text
-文件
-Embedding
-RAG
-Citation
-```
-
-主要掌握在产品自己手里。
-
-## 启发
-
-这是非常值得参考的一点：
-
-> 文件和 RAG 层应该属于产品，而不是属于 Provider。
-
----
-
-# 8. LobeChat / LobeHub
-
-LobeChat 的特点：
-
-```text
-Provider 数量极多
-```
-
-支持：
-
-```text
-OpenAI
-Anthropic
-Gemini
-OpenRouter
-DeepSeek
-Qwen
-Moonshot
-智谱
-MiniMax
-火山
-百度
-讯飞
-等等
-```
-
-## 但它的文件层：
-
-```text
-依然是：
-自建 Knowledge Base
-```
-
-使用：
-
-```text
-PGVector
-Embedding
-Object Storage
-Unstructured
-```
-
-等技术栈。
-
-## 启发
-
-说明：
-
-> 即使 Provider 覆盖做到非常高，文件层依然建议自己掌握。
-
----
-
-# 9. Langflow
-
-Langflow 是：
-
-```text
-Low-code AI Builder
-```
-
-重点：
-
-```text
-Agent
-MCP
-Workflow
-RAG
-节点式编排
-```
-
-## 特点
-
-```text
-Provider 组件化
-File Component
-MCP
-Workflow
-```
-
-## 启发
-
-Langflow 的核心启发：
-
-> 文件、Provider、向量库、MCP 都应该是组件，而不是写死在模型调用里。
-
----
-
-# 10. Flowise
-
-Flowise 的特点：
-
-```text
-视觉化 Agent Workflow
-```
-
-大量能力依赖：
-
-```text
-LangChain ecosystem
-```
-
-## 特点
-
-```text
-组件化
-Workflow
-节点式 Agent
-```
-
-## Provider 集成特点
-
-```text
-广覆盖
-但深度较浅
-```
-
-## 启发
-
-说明：
-
-> 组件化可以快速覆盖 Provider，但难以保证深度体验一致性。
-
----
-
-# 11. n8n
-
-n8n 的重点：
-
-```text
-不是模型
-而是：
-Workflow + Tools + External Systems
-```
-
-## 特点
+我的判断是：
 
-```text
-AI Agent
-Tool Calling
-Human Review
-422+ integrations
-```
-
-## 文件能力
-
-更多通过：
-
-```text
-节点
-Workflow
-RAG
-```
-
-实现。
-
-## 启发
-
-Agent 的价值不只是模型。
-
-更重要的是：
-
-```text
-工具
-审批
-业务系统
-Workflow
-```
-
----
-
-# 12. Coze / 扣子
-
-Coze 的特点：
-
-```text
-平台化
-```
-
-重点：
-
-```text
-Knowledge
-Plugin
-Workflow
-Channel
-Publishing
-```
-
-## 文件能力
-
-知识库能力较强。
-
-但：
-
-```text
-Provider 抽象不透明
-```
-
-## 启发
-
-适合：
-
-```text
-业务用户
-低代码
-```
-
-但：
-
-```text
-不适合做极致开放的 BYOK 平台
-```
-
----
-
-# 13. Botpress
-
-Botpress 更偏：
-
-```text
-客服 Agent
-企业业务 Agent
-```
-
-## 特点
-
-```text
-Knowledge Base
-Channels
-Business Workflow
-```
-
-## 文件能力
-
-强调：
-
-```text
-documents
-websites
-structured data
-```
-
-## 启发
-
-垂直业务 Agent：
-
-```text
-更关注业务流程
-而不是 Provider 深度
-```
-
----
-
-# 14. Coding Agent 路线
-
-Coding Agent 和普通 Agent 完全不同。
-
-重点：
-
-```text
-代码库
-终端
-工具执行
-文件系统
-```
-
-而不是：
-
-```text
-PDF / DOCX 文件上传
-```
-
----
-
-# 15. Cline
-
-Cline 的路线：
-
-```text
-Every model
-No vendor lock-in
-```
-
-## 特点
-
-```text
-BYOK
-终端
-Browser
-文件系统
-Tool execution
-Approval
-```
-
-## 启发
-
-真正的 Agent：
-
-```text
-价值来自：
-工具执行闭环
-```
-
-而不是：
-
-```text
-聊天
-```
-
----
-
-# 16. Roo Code
-
-Roo Code 的特点：
-
-```text
-Profile 化
-```
+> 行业已经解决了“多模型可用”，但还没有真正解决“多模型差异统一”。
 
-不同 profile：
+也就是说，支持更多 Provider 本身正在变成基础能力。更有价值的问题变成了：当用户把 OpenAI、Claude、Gemini、Qwen、DeepSeek、Kimi、本地模型和各种 OpenAI-compatible endpoint 接入同一个 Agent 产品时，产品能不能把这些差异藏起来，让用户面向任务而不是面向模型能力做决策。
 
-```text
-不同 Provider
-不同模型
-不同参数
-```
-
-还能通过：
-
-```text
-LiteLLM
-```
-
-扩展 100+ Provider。
-
-## 启发
-
-这是很值得参考的：
-
-> “同一个用户，不同任务，使用不同 Provider Profile”。
-
----
-
-# 17. Continue
-
-Continue 的特点：
-
-```text
-模型分角色
-```
-
-例如：
-
-```text
-chat model
-edit model
-autocomplete model
-embed model
-rerank model
-```
-
-## 启发
-
-这是未来趋势：
-
-> 不再是“一个模型干所有事”。
-
-而是：
-
-```text
-不同能力 → 不同模型
-```
-
----
-
-# 18. Zed
-
-Zed 的特点：
-
-```text
-大量 Provider
-本地模型
-BYOK
-```
-
-支持：
-
-```text
-OpenAI
-Anthropic
-DeepSeek
-OpenRouter
-Ollama
-LM Studio
-Bedrock
-Vercel AI Gateway
-```
-
-## 启发
-
-成熟产品会支持：
-
-```text
-Official Provider
-OpenAI-compatible
-Local Model
-Gateway
-```
-
-四类入口。
-
----
-
-# 19. OpenCode
-
-OpenCode 的特点：
-
-```text
-AI SDK + Models.dev
-```
-
-实现：
-
-```text
-75+ Provider
-```
-
-## 启发
-
-Provider 广覆盖：
-
-```text
-可以借助 SDK / Gateway
-```
-
-但：
+## 核心结论
 
-```text
-深度体验
-仍然要自己做
-```
-
----
-
-# 20. Cursor / Windsurf
-
-商业 Coding Agent：
-
-```text
-体验优先
-```
-
-特点：
+这次调研可以压缩成五个结论。
 
-```text
-Provider 不完全开放
-BYOK 有限制
-```
+第一，多 Provider 和 BYOK 已经不是强差异点。
 
-原因：
+开源 Chat/RAG、Agent Builder、Coding Agent、Low-code Workflow 产品基本都在支持多模型。OpenAI-compatible、LiteLLM、OpenRouter、Vercel AI Gateway 进一步降低了长尾模型接入成本。
 
-```text
-成本控制
-体验一致性
-产品治理
-```
+第二，大多数产品采用“广覆盖 + 浅统一”。
 
-## 启发
+产品通常会优先支持 API key、base URL、model name、streaming、基础 tool calling，再把复杂文件能力交给自建 RAG 或知识库。这样能快速覆盖 Provider，但无法完全抹平模型能力差异。
 
-商业产品：
+第三，文件层正在从 Provider 能力变成产品能力。
 
-```text
-通常会牺牲一部分自由度
-换体验
-```
+主流产品即使支持很多 Provider，文件上传、解析、chunk、embedding、retrieval、citation 往往仍然自己做。Provider 原生文件 API 更像 fast path，而不是唯一主路径。
 
----
+第四，Agent 产品的差异点不在“能不能调用模型”，而在执行闭环。
 
-# 21. LiteLLM / OpenRouter / AI Gateway 已成行业基础设施
+Coding Agent 尤其明显。Cline、Roo Code、Continue、Cursor、Windsurf 这类产品的核心不是聊天，而是代码库、终端、文件系统、工具调用、审批和上下文治理。
 
-这是一个非常重要的行业趋势。
+第五，未来机会在复杂性治理。
 
-很多产品：
+Capability Detection、Citation、Usage / Quota / Cost、Tool Calling 差异、文件策略路由，这些才是 Agent 产品从 demo 走向可持续使用时真正会遇到的问题。
 
-```text
-并不直接集成所有 Provider
-```
+## 成熟度分层
 
-而是：
+可以把 LLM Provider 集成成熟度分成七层。
 
-```text
-LiteLLM
-OpenRouter
-Vercel AI Gateway
-```
+| 层级 | 能力                                        | 行业现状                      |
+| ---- | ------------------------------------------- | ----------------------------- |
+| L1   | API Key / Base URL / Model Name 配置        | 基本都做到                    |
+| L2   | 多 Provider 预置                            | 很普遍                        |
+| L3   | OpenAI-compatible 兜底                      | 非常普遍                      |
+| L4   | Chat / Streaming / Tool Calling 统一        | 部分成熟                      |
+| L5   | 自建文件上传 / RAG / 向量库 / 知识库        | 主流产品基本都有              |
+| L6   | Provider 原生文件 API 深度集成              | 不普遍                        |
+| L7   | 成本 / 路由 / fallback / quota / usage 治理 | 多交给 Gateway 或自己只做浅层 |
 
-做：
+其中 L1-L3 已经是基础设施能力，L4-L5 是主流产品正在稳定化的能力，L6-L7 才是后续差异点。
 
-```text
-fallback
-routing
-统一 API
-quota
-usage
-high availability
-```
+一句话概括：
 
-## 但它们的局限
+> 多模型接入已经商品化，模型能力抽象还没有商品化。
 
-它们主要统一：
+## 产品路线分化
 
-```text
-Chat
-Completion
-Tool Calling
-Routing
-```
+主流 Agent 产品大致分成五条路线。
 
-不会替产品统一：
+| 路线                      | 代表产品                                                   | Provider 集成特点                         |
+| ------------------------- | ---------------------------------------------------------- | ----------------------------------------- |
+| Agent Builder             | Dify、Coze、Botpress                                       | 平台化，重 Workflow / Knowledge / Plugin  |
+| 自托管 Chat / RAG         | Open WebUI、LibreChat、AnythingLLM、LobeChat               | BYOK、自建 RAG、多模型、OpenAI-compatible |
+| Low-code Agent / Workflow | Langflow、Flowise、n8n                                     | Provider、文件、工具、向量库都组件化      |
+| Coding Agent              | Cline、Roo Code、Continue、Cursor、Windsurf、Zed、OpenCode | 强工具执行、代码上下文、本地环境、审批    |
+| Model Gateway             | LiteLLM、OpenRouter、Vercel AI Gateway                     | 统一 API、routing、fallback、usage、cost  |
 
-```text
-Files API
-Knowledge Base
-Citation
-Page Reference
-File Lifecycle
-Provider File Cleanup
-```
+这五条路线的共同点是都在做 Provider 抽象，但抽象重点不同。
 
-所以：
+Agent Builder 更关注平台资源管理。Dify 的启发不是“接了多少 Provider”，而是把 Provider、Knowledge、Workflow、Plugin 抽成统一平台资源。Coze 和 Botpress 更偏业务用户和业务流程，Provider 自由度不是第一优先级。
 
-> 文件层和 RAG 层依然应该属于产品。
+自托管 Chat/RAG 产品更强调开放和可控。Open WebUI 代表协议优先路线，围绕 OpenAI-compatible 和本地模型做广覆盖。LibreChat、AnythingLLM、LobeChat 则说明一件事：即使 Provider 覆盖很广，文件层和 RAG 层仍然倾向于产品自己掌握。
 
----
+Low-code Agent 产品把 Provider 当成组件。Langflow、Flowise、n8n 的重点不是某一个模型，而是节点、工具、外部系统、审批和 Workflow。这里的启发是：Agent 的价值不只来自模型能力，而来自模型能连接什么系统。
 
-# 22. 行业已经普遍做好的能力
+Coding Agent 路线和通用 Agent 差异最大。Cline 强调 every model 和 no vendor lock-in，但真正价值在终端、浏览器、文件系统、工具执行和审批。Roo Code 的 profile 化说明同一个用户在不同任务下需要不同模型配置。Continue 的模型分角色也很关键：chat、edit、autocomplete、embed、rerank 不应该由同一个模型硬扛。
 
-主流 Agent 应用基本都会做：
+Model Gateway 已经成为行业基础设施。LiteLLM、OpenRouter、Vercel AI Gateway 能解决大量 Provider 广覆盖、routing、fallback、usage 和统一 API 问题。但它们不会替产品解决文件体验、citation、page reference、file lifecycle 和 Agent 工具语义。
 
-```text
-1. 多 Provider
-2. BYOK
-3. OpenAI-compatible
-4. Streaming
-5. Tool Calling
-6. 文件上传
-7. 自建 RAG
-8. 向量数据库
-9. Workflow
-10. Agent
-11. MCP / Plugin
-12. 本地模型
-13. API Key 校验
-```
+## 已经做好的能力
 
-这些已经逐渐变成：
+主流 Agent 应用普遍已经做到：
 
-```text
-基础能力
-```
+- 多 Provider；
+- BYOK；
+- OpenAI-compatible；
+- Streaming；
+- 基础 Tool Calling；
+- 文件上传；
+- 自建 RAG；
+- 向量数据库；
+- Workflow；
+- Agent；
+- MCP / Plugin；
+- 本地模型；
+- API Key 校验。
 
----
+这些能力很重要，但正在变成基础门槛。
 
-# 23. 行业普遍还没做好的能力
+如果一个 Agent 产品只是说自己支持很多模型，已经很难形成清晰差异。因为 Provider 广度可以通过 OpenAI-compatible、LiteLLM、OpenRouter、AI SDK、Models.dev 等生态能力快速补齐。
 
-这里才是真正的机会。
+真正的问题是：当用户在复杂任务里使用这些模型时，产品是否能稳定处理 Provider 差异。
 
----
+## 还没做好的能力
 
-## 23.1 Provider 原生文件能力没有统一打穿
+这里才是机会。
 
-大多数产品：
+### 1. Provider 原生文件能力没有统一打穿
 
-```text
-支持文件上传
-```
+很多产品都支持文件上传，但大多数并不是逐家深度接入 Provider 原生文件 API，而是自己解析、chunk、embedding、retrieval。
 
-但：
+这不是坏事。相反，它说明文件层应该是产品核心层。
 
-```text
-不是 Provider 原生文件 API
-```
+Provider 原生文件能力可以作为 fast path，例如：
 
-而是：
+- OpenAI Responses input file / File Search；
+- Gemini File API；
+- Claude document block；
+- Qwen-Long；
+- Kimi file extraction；
+- 国内云厂商或模型厂商的原生知识库能力。
 
-```text
-自己解析
-自己 chunk
-自己 embedding
-自己 retrieval
-```
+但产品不能完全依赖这些能力。因为不同 Provider 的文件格式、文件生命周期、引用质量、上下文窗口、费用模型和能力边界都不同。
 
-很少真正深度利用：
+更稳的路线是：
 
 ```text
-OpenAI Responses input_file
-OpenAI File Search
-Gemini File API
-Claude document block
-Qwen-Long
-Kimi file extraction
-火山/百度/腾讯/智谱原生知识库
+产品自建 File Service / Parser / OCR / Chunker / RAG / Citation
+Provider 原生文件能力作为可选 fast path
 ```
-
----
 
-## 23.2 Capability Detection 很粗糙
+### 2. Capability Detection 很粗糙
 
-大多数产品只做到：
+多数产品只做到：
 
 ```text
 provider -> model list
 ```
 
-而没有做到：
+但 Agent 产品真正需要的是：
 
 ```text
 provider + model + task + file type + strategy
 ```
 
-行业缺少：
+例如，一个模型是否支持 PDF，不足以指导产品决策。更细的问题是：
 
-```text
-精细 capability schema
-```
+- 是否支持 scanned PDF？
+- 是否支持 docx？
+- 是否支持 file URL？
+- 是否支持 base64 file？
+- 是否支持 provider file id？
+- 是否能返回 citation？
+- citation 是否有页码？
+- tool calling 是否支持 streaming？
+- 是否支持 parallel tool calls？
+- usage 是否能标准化？
 
----
-
-## 23.3 Citation / 页码统一很弱
-
-很多产品：
-
-```text
-引用不稳定
-页码错误
-表格引用差
-扫描件支持差
-```
-
-这里有很大优化空间。
-
----
-
-## 23.4 Usage / Quota / Cost 治理不够
-
-BYOK 产品经常遇到：
-
-```text
-余额不足
-权限不足
-region 不支持
-文件额外收费
-不同 Provider usage 格式不同
-```
-
-大多数产品：
-
-```text
-只是简单报错
-```
-
-而不是：
-
-```text
-统一 usage / quota / routing / fallback
-```
-
----
-
-## 23.5 Tool Calling 差异没有真正被抽象
-
-不同 Provider：
-
-```text
-OpenAI tools
-Anthropic tool_use
-Gemini function calling
-Mistral tools
-Qwen tools
-```
-
-差异很大。
-
-多数产品：
-
-```text
-只是浅层兼容
-```
-
-复杂 Agent：
-
-```text
-仍会出现：
-tool 参数错误
-parallel tools 差异
-streaming 差异
-```
-
----
-
-# 24. 对你们产品的直接启发
-
-你们不应该只做：
-
-```text
-支持更多 Provider
-```
-
-因为：
-
-```text
-OpenAI-compatible + LiteLLM
-已经能解决很多广覆盖问题
-```
-
-真正有价值的是：
-
-```text
-统一复杂性
-```
-
----
-
-# 25. 推荐的产品路线
-
----
-
-## 第一层：Generic Provider
-
-覆盖长尾。
-
-支持：
-
-```text
-OpenAI-compatible
-LiteLLM
-OpenRouter
-Vercel AI Gateway
-Local Models
-```
-
-只承诺：
-
-```text
-文本 Chat
-Streaming
-基础 Tool Calling
-RAG 后文本输入
-```
-
----
-
-## 第二层：Tier 1 深度集成
-
-重点做：
-
-```text
-OpenAI
-Gemini
-Claude
-Qwen
-DeepSeek
-Kimi
-```
-
-其中：
-
-```text
-OpenAI / Gemini / Claude / Qwen：
-原生文件 + 自建 RAG 双路径
-
-DeepSeek：
-自建解析 + RAG + 文本输入
-
-Kimi：
-文件抽取 + 长上下文
-```
-
----
-
-## 第三层：文件层属于产品
-
-建议产品自己实现：
-
-```text
-File Service
-Parser
-OCR
-Chunker
-Embedding
-RAG
-Citation
-File Strategy Planner
-```
-
-Provider 原生文件 API：
-
-```text
-只是 fast path
-```
-
----
-
-## 第四层：Capability Registry
-
-行业普遍缺：
-
-```text
-细粒度 capability schema
-```
-
-你们可以做：
+这意味着产品需要一个 Capability Registry，而不是简单的模型列表。
 
 ```ts
 type ProviderCapability = {
   directFileInput: boolean;
   providerFileSearch: boolean;
   providerFileExtraction: boolean;
-
   supportsPdf: boolean;
   supportsDocx: boolean;
   supportsScannedPdf: boolean;
-
   supportsFileUrl: boolean;
   supportsBase64File: boolean;
   supportsProviderFileId: boolean;
-
   supportsCitation: boolean;
   supportsPageReference: boolean;
+  supportsToolCalling: boolean;
+  supportsParallelToolCalls: boolean;
 };
 ```
 
----
+Capability Registry 的价值不是展示给用户看，而是让产品能自动选择策略。
 
-# 26. 最终结论
+### 3. Citation / 页码统一很弱
 
-现在主流 Agent 应用已经做到：
+很多产品可以回答文件问题，但引用质量不稳定：
 
-```text
-多 Provider
-BYOK
-OpenAI-compatible
-文件上传
-RAG
-Workflow
-Tool Calling
-MCP
-本地模型
-```
+- 页码错误；
+- 来源混乱；
+- 表格定位差；
+- 扫描件支持差；
+- chunk 与原文位置无法稳定映射；
+- provider 原生 citation 和自建 RAG citation 格式不一致。
 
-但普遍没有做到：
+对于面向知识库、合同、政策、研究报告、企业文档的 Agent 产品，citation 不是装饰功能，而是信任基础。
 
-```text
-Provider 原生文件能力统一
-Capability 精细抽象
-Citation 统一
-Usage / Quota 治理
-文件策略自动路由
-Tool Calling 深度兼容
-```
+未来需要统一：
 
-因此：
+- chunk id；
+- page；
+- quote；
+- bbox；
+- source confidence；
+- raw document ref；
+- provider citation ref；
+- product citation ref。
 
-> 真正的机会，不是“支持更多模型”。
+### 4. Usage / Quota / Cost 治理不足
 
-而是：
+BYOK 产品经常遇到：
 
-```text
-把用户自带 LLM API 的复杂性藏起来
-```
+- 余额不足；
+- API key 权限不足；
+- region 不支持；
+- 文件额外收费；
+- context window 超限；
+- rate limit；
+- usage 字段格式不同；
+- provider 报错不可读。
 
-通过：
+多数产品只是把错误抛给用户，或者显示一个通用失败提示。
 
-```text
-统一文件层
-统一 RAG
-统一 Citation
-统一 Capability
-统一 Planner
-统一 Error
-统一 Usage
-```
+更好的体验应该是：
 
-构建：
+- 统一错误分类；
+- 预估 token / 文件费用；
+- 标准化 usage；
+- 标准化 quota；
+- 推荐 fallback；
+- 在策略允许时自动切换模型；
+- 提醒用户某个 Provider 不适合当前任务。
 
-> BYOK LLM Orchestration + File Intelligence Layer
+BYOK 不等于“用户自己承担全部复杂性”。好的 BYOK Agent 产品应该把用户自己的 key 变成可治理资源。
+
+### 5. Tool Calling 差异没有真正被抽象
+
+不同 Provider 的 tool calling 差异很大：
+
+- OpenAI tools；
+- Anthropic tool_use；
+- Gemini function calling；
+- Mistral tools；
+- Qwen tools；
+- OpenAI-compatible endpoint 的不完全兼容。
+
+复杂 Agent 里，这些差异会影响：
+
+- tool 参数 schema；
+- parallel tool calls；
+- streaming tool call；
+- tool result 顺序；
+- error recovery；
+- JSON 修复；
+- provider-specific message format。
+
+只做浅层兼容，会导致 demo 能跑，但长任务不稳定。
+
+## 推荐产品路线
+
+如果要做一个面向 BYOK 和多模型的 Agent 产品，我会采用四层路线。
+
+### 第一层：Generic Provider
+
+用于覆盖长尾模型。
+
+支持：
+
+- OpenAI-compatible；
+- LiteLLM；
+- OpenRouter；
+- Vercel AI Gateway；
+- Ollama / LM Studio；
+- Local Models；
+- 自定义 Base URL。
+
+这一层只承诺基础能力：
+
+- Text Chat；
+- Streaming；
+- 基础 Tool Calling；
+- RAG 后文本输入。
+
+不要对长尾 Provider 承诺完整文件体验和复杂 Agent 能力。
+
+### 第二层：Tier 1 深度集成
+
+选择少数主流 Provider 做深度适配。
+
+优先级可以是：
+
+- OpenAI；
+- Claude；
+- Gemini；
+- Qwen；
+- DeepSeek；
+- Kimi。
+
+不同 Provider 的策略应该不同：
+
+| Provider                        | 建议策略                                |
+| ------------------------------- | --------------------------------------- |
+| OpenAI / Gemini / Claude / Qwen | 原生文件 + 自建 RAG 双路径              |
+| DeepSeek                        | 自建文件层 + RAG + 文本输入             |
+| Kimi                            | 文件抽取 + 长上下文能力利用             |
+| 本地模型                        | 文本输入 + 本地 embedding / rerank 组合 |
+
+核心不是平等支持所有模型，而是明确不同模型适合什么任务。
+
+### 第三层：文件层属于产品
+
+产品应该自己拥有文件层：
+
+- File Service；
+- Parser；
+- OCR；
+- Chunker；
+- Embedding；
+- Vector Store；
+- Citation；
+- File Strategy Planner；
+- File Lifecycle；
+- Cleanup；
+- Raw Ref。
+
+Provider 原生文件 API 不是不用，而是作为策略之一。
+
+真正的产品能力是：给定一个文件和一个任务，系统能判断应该走自建 RAG、长上下文、Provider 原生文件、OCR、表格抽取，还是组合策略。
+
+### 第四层：Capability Registry + Strategy Planner
+
+Capability Registry 解决“模型能做什么”。
+
+Strategy Planner 解决“当前任务应该怎么用模型”。
+
+例如用户上传一个扫描 PDF 并要求生成带页码引用的问答结果，系统应该能判断：
+
+- 这个 Provider 是否支持 scanned PDF；
+- 是否需要 OCR；
+- citation 是否可信；
+- 是否应该走自建 parser；
+- 是否需要 embedding；
+- 是否能用当前模型窗口直接塞入；
+- 是否要换一个更适合文件任务的模型；
+- 成本是否超出预算。
+
+这才是多 Provider Agent 产品真正的体验层。
+
+## 对 Agent PM 的启发
+
+从产品经理角度，这篇调研最重要的启发不是“要接哪些 Provider”，而是下面五个判断。
+
+第一，Provider 数量不是核心指标。
+
+支持 100 个 Provider 不等于体验好。用户真正关心的是当前任务能不能完成，文件能不能读准，引用能不能信，费用能不能控，错误能不能解释。
+
+第二，Agent 产品要从模型中心转向任务中心。
+
+用户不应该先理解每个模型的能力边界，再决定怎么完成任务。产品应该根据任务、文件、工具、权限和成本自动选择策略。
+
+第三，文件和 RAG 是产品层，不是模型附属功能。
+
+如果文件层完全依赖 Provider，产品会被不同模型的文件能力牵着走。自建文件层虽然复杂，但能换来可控性和一致体验。
+
+第四，Coding Agent 的经验值得迁移。
+
+Coding Agent 更早面对工具调用、权限、文件系统、长任务、审批和本地环境问题。它们对 Agent 产品的启发，比普通 Chat/RAG 产品更强。
+
+第五，复杂性治理本身就是产品价值。
+
+BYOK、多模型、本地模型、Gateway、原生文件 API、自建 RAG、Tool Calling，这些能力单独看都不稀缺。真正稀缺的是把它们组织成用户可理解、可控制、可恢复的任务体验。
+
+## 结论
+
+2026 年的主流 Agent 应用已经普遍完成了多 Provider、BYOK、OpenAI-compatible、文件上传、RAG、Workflow、Tool Calling、MCP 和本地模型这些基础能力。
+
+但行业还没有普遍解决：
+
+- Provider 原生文件能力统一；
+- Capability 精细抽象；
+- Citation 统一；
+- Usage / Quota / Cost 治理；
+- 文件策略自动路由；
+- Tool Calling 深度兼容。
+
+因此，真正的机会不是“支持更多模型”，而是：
+
+> 把用户自带 LLM API 的复杂性藏起来。
+
+通过统一文件层、统一 RAG、统一 Citation、统一 Capability、统一 Planner、统一 Error 和统一 Usage，Agent 产品才能从“多模型可用”走向“多模型可治理”。
